@@ -1,0 +1,2407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SBOM Viewer - Software Bill of Materials (Standalone)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .notice {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            text-align: center;
+            border-bottom: 2px solid #ffc107;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            background: #f8f9fa;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #495057;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .tab:hover {
+            background: #e9ecef;
+        }
+
+        .tab.active {
+            background: white;
+            color: #667eea;
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .content {
+            padding: 40px;
+            min-height: 500px;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metadata-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .metadata-card h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .metadata-card p {
+            margin: 8px 0;
+            color: #495057;
+        }
+
+        .metadata-card .label {
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .stat-card h4 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .stat-card p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .file-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .file-table th {
+            background: #f8f9fa;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .file-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .file-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .file-path {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #495057;
+        }
+
+        .license-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #28a745;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .summary-section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .summary-section h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .summary-item {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .summary-item h4 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .summary-item p {
+            color: #212529;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .info-box {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #17a2b8;
+            margin: 20px 0;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .metadata-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📦 SBOM Viewer</h1>
+            <p>Software Bill of Materials Explorer (Standalone)</p>
+        </div>
+
+        <div class="notice">
+            ⚡ This is a standalone viewer with embedded sample data (50 files out of 1,162 total)
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('overview')">Overview</button>
+            <button class="tab" onclick="showTab('files')">Sample Files</button>
+            <button class="tab" onclick="showTab('packages')">Packages</button>
+            <button class="tab" onclick="showTab('relationships')">Sample Relationships</button>
+        </div>
+
+        <div class="content">
+            <!-- Overview Tab -->
+            <div id="overview" class="tab-content active">
+                <h2>SBOM Overview</h2>
+                
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <h4 id="total-files">-</h4>
+                        <p>Total Files</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4 id="total-packages">-</h4>
+                        <p>Total Packages</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4 id="total-relationships">-</h4>
+                        <p>Relationships</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4 id="spdx-version">-</h4>
+                        <p>SPDX Version</p>
+                    </div>
+                </div>
+
+                <div class="metadata-grid">
+                    <div class="metadata-card">
+                        <h3>Document Information</h3>
+                        <p><span class="label">Name:</span> <span id="doc-name">-</span></p>
+                        <p><span class="label">Namespace:</span> <span id="doc-namespace" style="font-size: 0.9em; word-break: break-all;">-</span></p>
+                        <p><span class="label">SPDX ID:</span> <span id="doc-spdxid">-</span></p>
+                        <p><span class="label">Data License:</span> <span id="doc-license">-</span></p>
+                    </div>
+                    <div class="metadata-card">
+                        <h3>Creation Details</h3>
+                        <p><span class="label">Created:</span> <span id="creation-date">-</span></p>
+                        <p><span class="label">Creator:</span> <span id="creator">-</span></p>
+                        <p><span class="label">License List Version:</span> <span id="license-version">-</span></p>
+                    </div>
+                </div>
+
+                <div class="summary-section">
+                    <h3>License Distribution</h3>
+                    <div id="license-summary" class="summary-grid">
+                        <!-- License summary will be populated here -->
+                    </div>
+                </div>
+
+                <div class="summary-section">
+                    <h3>File Type Distribution</h3>
+                    <div id="filetype-summary" class="summary-grid">
+                        <!-- File type summary will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Files Tab -->
+            <div id="files" class="tab-content">
+                <h2>Sample Files</h2>
+                
+                <div class="info-box">
+                    ℹ️ Showing 50 sample files out of <strong id="total-files-notice">1,162</strong> total files in the SBOM
+                </div>
+
+                <div id="files-container">
+                    <!-- Files table will be populated here -->
+                </div>
+            </div>
+
+            <!-- Packages Tab -->
+            <div id="packages" class="tab-content">
+                <h2>Packages</h2>
+                
+                <div id="packages-container">
+                    <!-- Packages will be populated here -->
+                </div>
+            </div>
+
+            <!-- Relationships Tab -->
+            <div id="relationships" class="tab-content">
+                <h2>Sample Relationships</h2>
+                
+                <div class="info-box">
+                    ℹ️ Showing 50 sample relationships out of <strong id="total-relationships-notice">1,162</strong> total relationships in the SBOM
+                </div>
+
+                <div id="relationships-container">
+                    <!-- Relationships table will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>const EMBEDDED_SBOM_DATA = {
+  "metadata": {
+    "name": "SBOM-SPDX-8322342f-5d99-466a-b490-85492bf55b87",
+    "spdxVersion": "SPDX-2.3",
+    "SPDXID": "SPDXRef-DOCUMENT",
+    "documentNamespace": "https://spdx.org/spdxdocs/k8s-releng-bom-5d8fd584-fa93-4a3b-8247-326d9baf2bb6",
+    "dataLicense": "CC0-1.0",
+    "creationInfo": {
+      "created": "2025-08-11T14:11:49Z",
+      "creators": [
+        "Tool: bom-v0.6.0"
+      ],
+      "licenseListVersion": "3.21"
+    }
+  },
+  "statistics": {
+    "totalFiles": 1162,
+    "totalPackages": 1,
+    "totalRelationships": 1162,
+    "licenseStats": {
+      "Apache-2.0": 1162
+    },
+    "typeStats": {
+      "TEXT": 1035,
+      "SOURCE": 65,
+      "BINARY": 21,
+      "APPLICATION": 21,
+      "DOCUMENTATION": 52,
+      "IMAGE": 7,
+      "OTHER": 34
+    }
+  },
+  "sampleFiles": [
+    {
+      "fileName": "apps/centraldashboard/upstream/base/service.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "781d7bca17e790c7..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/third-party/argo/upstream/manifests/cluster-install/workflow-controller-rbac/workflow-aggregate-roles.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "f93714d83118fccd..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/env/aws/aws-configuration-pipeline-ui-patch.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "aa153585c5651885..."
+    },
+    {
+      "fileName": "common/istio-1-24/cluster-local-gateway/base/gateway-authorizationpolicy.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "740046819f363a80..."
+    },
+    {
+      "fileName": "common/dex/base/deployment.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "5d8c30641b89a889..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/base/installs/multi-user/view-edit-cluster-roles.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "2c0d932f2d027de2..."
+    },
+    {
+      "fileName": "common/networkpolicies/base/tensorboards-web-app.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "ebd0e3383cac5b8b..."
+    },
+    {
+      "fileName": "common/knative/knative-serving/base/patches/sidecar-injection.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "f1a8df706d866cc3..."
+    },
+    {
+      "fileName": "apps/profiles/upstream/rbac/leader_election_role.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "611b6a5ef745bb77..."
+    },
+    {
+      "fileName": "scripts/synchronize-kserve-web-application-manifests.sh",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "SOURCE"
+      ],
+      "sha256": "6d9d5db6aba58c71..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/third-party/postgresql/base/kustomization.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "93be967db32a3d6e..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/third-party/minio/base/minio-service.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "e3e481dd120caef4..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/third-party/argo/upstream/manifests/quick-start/base/httpbin/my-httpbin-cred-secret.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "2f0c55d538e1dfe4..."
+    },
+    {
+      "fileName": "apps/tensorboard/tensorboard-controller/upstream/rbac/role_binding.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "92b7fc24f7999fe5..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/base/metadata/options/istio/kustomization.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "0247fd096ec326f3..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/third-party/postgresql/base/pg-service.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "4d3fa0c2d7ab3351..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/base/metadata/base/metadata-grpc-service.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "563a07fda73b5f77..."
+    },
+    {
+      "fileName": "experimental/security/PSS/static/restricted/kustomization.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "75d28afafaa8b648..."
+    },
+    {
+      "fileName": "experimental/security/PSS/static/restricted/patches/cert-manager-labels.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "6b2172e28878d703..."
+    },
+    {
+      "fileName": "apps/tensorboard/tensorboard-controller/upstream/default/kustomization.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "0fc43d06de36449d..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/base/installs/multi-user/pipelines-ui/deployment-patch.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "45597b436f4a934f..."
+    },
+    {
+      "fileName": "common/networkpolicies/base/jupyter-web-app.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "f85937e6c7e799d7..."
+    },
+    {
+      "fileName": "tests/gh-actions/install_trivy.sh",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "SOURCE"
+      ],
+      "sha256": "3a8b41d229317967..."
+    },
+    {
+      "fileName": "apps/pvcviewer-controller/upstream/default/remove_namespace.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "16bac16c509a967f..."
+    },
+    {
+      "fileName": "apps/kserve/models-web-app/overlays/kubeflow/web-app-authorization-policy.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "e57a88b7151c1db8..."
+    },
+    {
+      "fileName": "common/istio-cni-1-24/istio-namespace/base/namespace.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "635fc64410d52d64..."
+    },
+    {
+      "fileName": "apps/pvcviewer-controller/upstream/rbac/auth_proxy_role_binding.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "a679d7f622b4b6e4..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/third-party/argo/upstream/manifests/cluster-install/workflow-controller-rbac/workflow-controller-clusterrolebinding.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "d69e18470b36a7ff..."
+    },
+    {
+      "fileName": "common/istio-1-24/cluster-local-gateway/base/gateway.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "230d682a5ff16395..."
+    },
+    {
+      "fileName": "apps/training-operator/upstream/v2/base/manager/kustomization.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "1cee90d4b4824d76..."
+    },
+    {
+      "fileName": "common/oauth2-proxy/components/istio-external-auth/authorizationpolicy.istio-ingressgateway-oauth2-proxy.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "9935a1ae6780a9f8..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/base/pipeline/pipeline-runner-role.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "7f763c14e07e5f66..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/base/installs/multi-user/persistence-agent/kustomization.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "adbc7877de4d44a8..."
+    },
+    {
+      "fileName": "apps/profiles/upstream/overlays/kubeflow/authorizationpolicy.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "ec0d6d92db97d84a..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/base/installs/multi-user/scheduled-workflow/deployment-patch.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "d43353ecedd030a1..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/third-party/argo/upstream/manifests/quick-start/mysql/overlays/workflow-controller-configmap.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "a7119ebfeb42c397..."
+    },
+    {
+      "fileName": "apps/centraldashboard/upstream/base/clusterrole.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "f24266708cc74606..."
+    },
+    {
+      "fileName": ".github/workflows/tensorboard_controller_test.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "e92e28ddb76e10f7..."
+    },
+    {
+      "fileName": "common/knative/OWNERS",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "BINARY",
+        "APPLICATION"
+      ],
+      "sha256": "3188232264dbefec..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/base/pipeline/ml-pipeline-scheduledworkflow-sa.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "687d84139efe4b8f..."
+    },
+    {
+      "fileName": "apps/katib/upstream/installs/katib-standalone/katib-config.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "e34aeae42b5933dc..."
+    },
+    {
+      "fileName": "experimental/ray/raycluster_example.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "54e9b242491f52a1..."
+    },
+    {
+      "fileName": "apps/tensorboard/tensorboard-controller/upstream/default/manager_auth_proxy_patch.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "314c8a26923754d0..."
+    },
+    {
+      "fileName": "apps/katib/upstream/installs/katib-external-db/katib-config.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "c52768845ef34002..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/base/cache-deployer/kustomization.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "1c0e6b61dc45be48..."
+    },
+    {
+      "fileName": "apps/pipeline/upstream/env/gcp/cloudsql-proxy/kustomization.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "8c39e6b865fcd85a..."
+    },
+    {
+      "fileName": "apps/jupyter/notebook-controller/upstream/manager/manager.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "eb5bbf93dea1808e..."
+    },
+    {
+      "fileName": "apps/model-registry/upstream/options/ui/base/model-registry-ui-role.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "b6925c69495c8002..."
+    },
+    {
+      "fileName": ".github/workflows/profiles_test.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "2bac207ba6f7aafe..."
+    },
+    {
+      "fileName": "apps/katib/upstream/components/mysql/kustomization.yaml",
+      "licenseConcluded": "Apache-2.0",
+      "fileTypes": [
+        "TEXT"
+      ],
+      "sha256": "aab3c511b75aee19..."
+    }
+  ],
+  "sampleRelationships": [
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.gitattributes"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-PULLC95REQUESTC95TEMPLATE.md"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-ISSUEC95TEMPLATE-issue-report.yml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-centraldashboardC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-ISSUEC95TEMPLATE-config.yml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-admissionC95webhookC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-dexC95oauth2-proxyC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-katibC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-fullC95kubeflowC95integrationC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-lintingC95bashC95pythonC95yamlC95files.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-manifestsC95exampleC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-jupyterC95webC95applicationC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-kserveC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-modelC95registryC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-pipelineC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-notebookC95controllerC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-pipelineC95swfsC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-profilesC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-pipelineC95runC95fromC95notebook.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-sparkC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-tensorboardC95controllerC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-rayC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-trivy.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-stale.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-trainingC95operatorC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-tensorboardsC95webC95applicationC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.shellcheckrc"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.github-workflows-volumesC95webC95applicationC95test.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.yamllint.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.pre-commit-config.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-.gitignore"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-CICDC95installC95kf.sh"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-DockerfileC95installC95kf"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-cluster-role-binding.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-OWNERS"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-deployment.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-crd.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-cluster-role.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-README.md"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-LICENSE"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-kustomization.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-mutating-webhook-configuration.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-params.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-service-account.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-overlays-cert-manager-deployment.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-overlays-cert-manager-certificate.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-overlays-cert-manager-params.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-service.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-admission-webhook-upstream-overlays-cert-manager-kustomization.yaml"
+    },
+    {
+      "source": "SPDXRef-Package-manifests",
+      "type": "CONTAINS",
+      "target": "SPDXRef-File-manifests-apps-centraldashboard-overlays-oauth2-proxy-kustomization.yaml"
+    }
+  ],
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-manifests",
+      "name": "manifests",
+      "versionInfo": "",
+      "filesAnalyzed": true,
+      "licenseConcluded": "Apache-2.0",
+      "downloadLocation": "NONE",
+      "copyrightText": "NOASSERTION",
+      "hasFiles": [
+        "SPDXRef-File-manifests-.gitattributes",
+        "SPDXRef-File-manifests-.github-PULLC95REQUESTC95TEMPLATE.md",
+        "SPDXRef-File-manifests-.github-ISSUEC95TEMPLATE-issue-report.yml",
+        "SPDXRef-File-manifests-.github-workflows-centraldashboardC95test.yaml",
+        "SPDXRef-File-manifests-.github-ISSUEC95TEMPLATE-config.yml",
+        "SPDXRef-File-manifests-.github-workflows-admissionC95webhookC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-dexC95oauth2-proxyC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-katibC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-fullC95kubeflowC95integrationC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-lintingC95bashC95pythonC95yamlC95files.yaml",
+        "SPDXRef-File-manifests-.github-workflows-manifestsC95exampleC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-jupyterC95webC95applicationC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-kserveC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-modelC95registryC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-pipelineC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-notebookC95controllerC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-pipelineC95swfsC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-profilesC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-pipelineC95runC95fromC95notebook.yaml",
+        "SPDXRef-File-manifests-.github-workflows-sparkC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-tensorboardC95controllerC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-rayC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-trivy.yaml",
+        "SPDXRef-File-manifests-.github-workflows-stale.yaml",
+        "SPDXRef-File-manifests-.github-workflows-trainingC95operatorC95test.yaml",
+        "SPDXRef-File-manifests-.github-workflows-tensorboardsC95webC95applicationC95test.yaml",
+        "SPDXRef-File-manifests-.shellcheckrc",
+        "SPDXRef-File-manifests-.github-workflows-volumesC95webC95applicationC95test.yaml",
+        "SPDXRef-File-manifests-.yamllint.yaml",
+        "SPDXRef-File-manifests-.pre-commit-config.yaml",
+        "SPDXRef-File-manifests-.gitignore",
+        "SPDXRef-File-manifests-CICDC95installC95kf.sh",
+        "SPDXRef-File-manifests-DockerfileC95installC95kf",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-OWNERS",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-deployment.yaml",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-crd.yaml",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-cluster-role.yaml",
+        "SPDXRef-File-manifests-README.md",
+        "SPDXRef-File-manifests-LICENSE",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-mutating-webhook-configuration.yaml",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-params.yaml",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-service-account.yaml",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-overlays-cert-manager-deployment.yaml",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-overlays-cert-manager-certificate.yaml",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-overlays-cert-manager-params.yaml",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-base-service.yaml",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-overlays-cert-manager-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-overlays-oauth2-proxy-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-admission-webhook-upstream-overlays-cert-manager-mutating-webhook-configuration.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-base-clusterrole.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-base-clusterrole-binding.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-base-deployment.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-base-params.env",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-base-configmap.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-base-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-base-service-account.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-base-role.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-overlays-istio-params.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-overlays-istio-authorizationpolicy.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-overlays-istio-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-base-service.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-overlays-kserve-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-base-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-overlays-istio-virtual-service.yaml",
+        "SPDXRef-File-manifests-apps-centraldashboard-upstream-overlays-kserve-patches-configmap.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-base-deployment.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-base-cluster-role.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-base-configs-logos-configmap.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-base-params.env",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-base-configs-spawnerC95uiC95config.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-base-service-account.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-base-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-overlays-istio-authorization-policy.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-overlays-istio-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-overlays-istio-destination-rule.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-base-role.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-base-service.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-overlays-istio-virtual-service.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-README.md",
+        "SPDXRef-File-manifests-apps-jupyter-jupyter-web-app-upstream-overlays-istio-params.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-crd-kustomizeconfig.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-crd-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-crd-patches-trivialC95conversionC95patch.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-crd-patches-cainjectionC95inC95notebooks.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-crd-patches-validationC95patches.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-crd-patches-webhookC95inC95notebooks.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-default-managerC95imageC95patch.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-default-managerC95authC95proxyC95patch.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-default-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-default-managerC95prometheusC95metricsC95patch.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-default-webhookcainjectionC95patch.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-default-managerC95webhookC95patch.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-manager-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-manager-params.env",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-manager-service-account.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-manager-manager.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-manager-service.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-overlays-kubeflow-patches-remove-namespace.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-overlays-kubeflow-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-overlays-standalone-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-rbac-authC95proxyC95role.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-rbac-authC95proxyC95roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-crd-bases-kubeflow.orgC95notebooks.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-rbac-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-rbac-leaderC95electionC95role.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-rbac-leaderC95electionC95roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-rbac-roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-samples-C95v1C95notebook.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-rbac-role.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-rbac-authC95proxyC95service.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-samples-C95v1alpha1C95notebook.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-rbac-userC95clusterC95roles.yaml",
+        "SPDXRef-File-manifests-apps-jupyter-notebook-controller-upstream-samples-C95v1beta1C95notebook.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-controller-rbac.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-controller-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-controller-service.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-controller-trial-templates.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-controller-controller.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-crd-experiment.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-crd-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-db-manager-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-crd-suggestion.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-mysql-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-mysql-mysql.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-db-manager-db-manager.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-db-manager-service.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-crd-trial.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-mysql-secret.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-mysql-service.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-namespace-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-postgres-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-mysql-pvc.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-postgres-postgres.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-namespace-namespace.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-ui-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-postgres-pvc.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-postgres-service.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-ui-rbac.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-postgres-secret.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-ui-service.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-webhook-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-cert-manager-certificate.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-cert-manager-katib-config.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-ui-ui.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-cert-manager-params.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-cert-manager-patches-katib-cert-injection.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-cert-manager-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-external-db-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-external-db-secrets.env",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-external-db-patches-db-manager.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-external-db-katib-config.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-components-webhook-webhooks.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-leader-election-leader-election-rbac.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-openshift-katib-config.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-leader-election-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-leader-election-katib-config.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-openshift-patches-service-serving-cert.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-openshift-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-standalone-postgres-katib-config.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-openshift-patches-webhook-inject-cabundle.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-standalone-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-standalone-katib-config.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-standalone-postgres-patches-db-manager.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-standalone-postgres-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-with-kubeflow-istio-authorizationpolicy.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-with-kubeflow-params.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-with-kubeflow-kubeflow-katib-roles.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-with-kubeflow-patches-istio-sidecar-injection.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-with-kubeflow-patches-enable-ui-authz-checks.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-with-kubeflow-patches-remove-namespace.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-with-kubeflow-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-with-kubeflow-patches-ui-rbac.yaml",
+        "SPDXRef-File-manifests-apps-kserve-OWNERS",
+        "SPDXRef-File-manifests-apps-katib-upstream-installs-katib-with-kubeflow-ui-virtual-service.yaml",
+        "SPDXRef-File-manifests-apps-kserve-UPGRADE.md",
+        "SPDXRef-File-manifests-apps-kserve-README.md",
+        "SPDXRef-File-manifests-apps-kserve-Makefile",
+        "SPDXRef-File-manifests-apps-kserve-kserve-aggregated-roles.yaml",
+        "SPDXRef-File-manifests-apps-kserve-kserve-kserve-cluster-resources.yaml",
+        "SPDXRef-File-manifests-apps-kserve-kserve-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-kserve-kserve-params.env",
+        "SPDXRef-File-manifests-apps-kserve-models-web-app-base-deployment.yaml",
+        "SPDXRef-File-manifests-apps-kserve-assets-kserveC95new.png",
+        "SPDXRef-File-manifests-apps-kserve-models-web-app-base-istio.yaml",
+        "SPDXRef-File-manifests-apps-kserve-models-web-app-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-kserve-models-web-app-base-rbac.yaml",
+        "SPDXRef-File-manifests-apps-kserve-models-web-app-base-service.yaml",
+        "SPDXRef-File-manifests-apps-kserve-models-web-app-overlays-kubeflow-params.yaml",
+        "SPDXRef-File-manifests-apps-kserve-models-web-app-overlays-kubeflow-patches-web-app-sidecar.yaml",
+        "SPDXRef-File-manifests-apps-kserve-models-web-app-overlays-kubeflow-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-kserve-models-web-app-overlays-kubeflow-patches-web-app-vsvc.yaml",
+        "SPDXRef-File-manifests-apps-kserve-models-web-app-overlays-kubeflow-web-app-authorization-policy.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-OWNERS",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-README.md",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-kserve-assets-kserve.png",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-base-model-registry-configmap.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-base-model-registry-deployment.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-base-model-registry-service.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-base-model-registry-sa.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-csi-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-csi-clusterstoragecontainer.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-istio-destination-rule.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-istio-istio-authorization-policy.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-istio-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-istio-virtual-service.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-kserve-kserve-kserveC95kubeflow.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-base-model-registry-ui-role.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-base-model-registry-ui-service-account.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-base-model-registry-ui-service.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-overlays-integrated-model-registry-ui-deployment.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-base-model-registry-ui-deployment.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-overlays-integrated-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-overlays-istio-destination-rule-ui.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-overlays-istio-model-registry-ui-service.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-overlays-istio-authorization-policy-ui.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-overlays-istio-virtual-service.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-overlays-istio-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-overlays-standalone-kubeflow-dashboard-rbac.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-overlays-standalone-model-registry-ui-deployment.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-options-ui-overlays-standalone-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-db-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-db-model-registry-db-pvc.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-db-model-registry-db-deployment.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-db-params.env",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-db-secrets.env",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-db-model-registry-db-service.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-db-patches-model-registry-deployment.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-postgres-model-registry-db-pvc.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-postgres-model-registry-db-deployment.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-postgres-params.env",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-postgres-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-postgres-model-registry-db-service.yaml",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-postgres-secrets.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-OWNERS",
+        "SPDXRef-File-manifests-apps-model-registry-upstream-overlays-postgres-patches-model-registry-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-Makefile",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-application-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-kserve-kserve-kserve.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-application-application.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-README.md",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-cache-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-cache-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-cache-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-cache-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-deployer-cache-deployer-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-deployer-cache-deployer-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-cache-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-deployer-cluster-scoped-cache-deployer-clusterrole.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-deployer-cache-deployer-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-deployer-cluster-scoped-cache-deployer-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-deployer-cluster-scoped-cache-deployer-clusterrolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-deployer-cluster-scoped-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-generic-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-crds-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-cache-deployer-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-crds-pipelines.kubeflow.orgC95pipelineversions.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-crds-pipelines.kubeflow.orgC95pipelines.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-generic-postgres-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-generic-params.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-generic-postgres-params.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-generic-pipeline-install-config.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-generic-mysql-secret.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-api-service-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-generic-postgres-pipeline-install-config.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-generic-postgres-postgres-secret-extended.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-api-service-deployment-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-api-service-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-api-service-params.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-api-service-cluster-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-cache-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-cache-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-cache-cluster-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-cache-deployment-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-istio-authorization-config.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-metadata-writer-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-metadata-writer-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-params.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-metadata-writer-cluster-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-persistence-agent-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-metadata-writer-deployment-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-persistence-agent-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-persistence-agent-cluster-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-persistence-agent-deployment-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-profile-controller-params.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-profile-controller-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-profile-controller-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-profile-controller-decorator-controller.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-profile-controller-requirements-dev.txt",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-profile-controller-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-ui-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-profile-controller-runC95tests.sh",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-ui-cluster-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-profile-controller-sync.py",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-profile-controller-testC95sync.py",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-ui-deployment-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-scheduled-workflow-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-ui-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-pipelines-ui-configmap-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-scheduled-workflow-cluster-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-scheduled-workflow-deployment-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-viewer-controller-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-scheduled-workflow-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-viewer-controller-deployment-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-view-edit-cluster-roles.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-viewer-controller-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-virtual-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-installs-multi-user-viewer-controller-cluster-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-base-metadata-envoy-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-base-metadata-grpc-configmap.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-base-metadata-grpc-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-base-metadata-grpc-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-options-istio-destination-rule.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-base-metadata-envoy-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-options-istio-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-options-istio-istio-authorization-policy.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-base-metadata-grpc-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-db-metadata-db-pvc.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-db-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-options-istio-virtual-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-db-metadata-db-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-db-params.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-db-secrets.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-db-metadata-db-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-postgres-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-postgres-metadata-db-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-db-patches-metadata-grpc-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-postgres-params.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-postgres-metadata-db-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-postgres-metadata-db-pvc.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-postgres-secrets.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-cluster-scoped-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-container-builder-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-metadata-overlays-postgres-patches-metadata-grpc-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-kfp-launcher-configmap.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-cluster-scoped-scheduled-workflow-crd.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-cluster-scoped-viewer-crd.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-metadata-writer-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-metadata-writer-metadata-writer-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-metadata-writer-metadata-writer-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-metadata-writer-metadata-writer-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-metadata-writer-metadata-writer-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-apiserver-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-apiserver-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-apiserver-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-apiserver-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-apiserver-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-persistenceagent-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-persistenceagent-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-persistenceagent-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-scheduledworkflow-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-persistenceagent-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-scheduledworkflow-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-scheduledworkflow-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-ui-configmap.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-scheduledworkflow-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-ui-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-ui-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-ui-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-ui-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-ui-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-viewer-crd-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-viewer-crd-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-viewer-crd-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-visualization-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-visualization-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-visualization-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-ml-pipeline-viewer-crd-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-pipeline-runner-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-pipeline-runner-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-pipeline-runner-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-postgresql-cache-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-postgresql-pipeline-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-pipeline-viewer-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-webhook-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-postgresql-pipeline-ml-pipeline-apiserver-deployment-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-postgresql-cache-cache-deployment-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-cluster-scoped-resources-namespace.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-webhook-params.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-cluster-scoped-resources-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-webhook-pipelineversion-mutating-webhook-config.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-aws-OWNERS",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-base-webhook-pipelineversion-validating-webhook-config.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-cluster-scoped-resources-params.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-aws-config",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-aws-aws-configuration-pipeline-ui-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-aws-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-aws-README.md",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-aws-aws-configuration-pipeline-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-aws-minio-artifact-secret-patch.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-aws-params.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-azure-OWNERS",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-aws-viewer-pod-template.json",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-aws-secret.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-azure-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-azure-minio-azure-gateway-minio-artifact-secret.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-azure-minio-azure-gateway-minio-azure-gateway-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-azure-mysql-secret.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-azure-params.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-azure-minio-azure-gateway-minio-azure-gateway-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-azure-minio-azure-gateway-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-base-cache-cert-issuer.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-base-cache-cert.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-azure-readme.md",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-base-params.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-base-webhook-certs-kfp-api-cert-issuer.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-base-webhook-certs-kfp-api-cert.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-base-webhook-certs-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-base-webhook-certs-params.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-cluster-scoped-resources-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-base-cache-webhook-config.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-dev-delete-cache-deployer.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-dev-namespace.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-dev-params.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-k8s-native-patches-mutating-webhook.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-k8s-native-patches-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-k8s-native-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-k8s-native-patches-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-k8s-native-patches-validating-webhook.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-dev-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-multi-user-patches-delete.crb.cache-deployer.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-multi-user-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-multi-user-patches-delete.deployment.cache-deployer.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-multi-user-patches-delete.role.cache-deployer.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-multi-user-patches-delete.rolebinding.cache-deployer.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-multi-user-patches-delete.clusterrole.cache-deployer.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-multi-user-patches-delete.sa.cache-deployer.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-multi-user-k8s-native-patches-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-multi-user-k8s-native-patches-mutating-webhook.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-multi-user-k8s-native-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-multi-user-k8s-native-patches-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-cert-manager-platform-agnostic-multi-user-k8s-native-patches-validating-webhook.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-dev-kind-forward-local-api-endpoint.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-dev-kind-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-cloudsql-proxy-cloudsql-proxy-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-cloudsql-proxy-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-dev-postgresql-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-dev-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-cloudsql-proxy-mysql-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-cloudsql-proxy-cloudsql-proxy-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-inverse-proxy-proxy-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-inverse-proxy-proxy-configmap.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-inverse-proxy-proxy-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-inverse-proxy-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-gcp-configurations-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-inverse-proxy-proxy-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-inverse-proxy-proxy-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-minio-gcs-gateway-minio-artifact-secret.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-minio-gcs-gateway-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-minio-gcs-gateway-minio-gcs-gateway-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-minio-gcs-gateway-minio-gcs-gateway-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-minio-gcs-gateway-minio-gcs-gateway-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-gcp-params.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-platform-agnostic-emissary-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-plain-multi-user-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-plain-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-platform-agnostic-multi-user-emissary-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-platform-agnostic-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-platform-agnostic-multi-user-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-hack-format.sh",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-platform-agnostic-postgresql-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-env-platform-agnostic-multi-user-legacy-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-hack-presubmit.sh",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-hack-release.sh",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-sample-cluster-scoped-resources-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-hack-test.sh",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-gcp-workload-identity-setup.sh",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-sample-README.md",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-sample-params-db-secret.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-sample-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-application-application-controller-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-application-application-controller-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-application-application-controller-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-sample-params.env",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-application-application-controller-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-application-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-application-application-controller-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-.krmignore",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-application-cluster-scoped-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-Kptfile",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-Makefile",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-application-cluster-scoped-application-crd.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-base-params.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-README.md",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-installs-cluster-workflow-controller-clusterrolebinding-patch.json",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-base-workflow-controller-deployment-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-base-workflow-controller-configmap-patch.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-installs-namespace-workflow-controller-deployment-patch.json",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-installs-namespace-cluster-scoped-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-Kptfile",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-installs-cluster-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-installs-namespace-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-argo-server-argo-server-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-argo-server-argo-server-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-argo-server-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-argo-server-argo-server-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-full-README.md",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-LICENSE",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-full-argoproj.ioC95workfloweventbindings.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-full-argoproj.ioC95workflowartifactgctasks.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-full-argoproj.ioC95workflowtaskresults.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-full-argoproj.ioC95workflowtasksets.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-full-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-minimal-README.md",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-minimal-argoproj.ioC95clusterworkflowtemplates.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-full-argoproj.ioC95clusterworkflowtemplates.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-full-argoproj.ioC95cronworkflows.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-minimal-argoproj.ioC95workfloweventbindings.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-minimal-argoproj.ioC95cronworkflows.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-full-argoproj.ioC95workflowtemplates.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-minimal-argoproj.ioC95workflowartifactgctasks.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-minimal-argoproj.ioC95workflows.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-minimal-argoproj.ioC95workflowtemplates.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-minimal-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-minimal-argoproj.ioC95workflowtasksets.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-workflow-controller-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-workflow-controller-workflow-controller-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-workflow-controller-workflow-controller-priorityclass.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-workflow-controller-workflow-controller-configmap.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-minimal-argoproj.ioC95workflowtaskresults.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-cluster-install-argo-server-rbac-argo-server-clusterole.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-workflow-controller-workflow-controller-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-cluster-install-argo-server-rbac-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-cluster-install-argo-server-rbac-argo-server-clusterolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-cluster-install-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-cluster-install-workflow-controller-rbac-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-cluster-install-workflow-controller-rbac-workflow-controller-clusterrole.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-cluster-install-workflow-controller-rbac-workflow-controller-clusterrolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-cluster-install-workflow-controller-rbac-workflow-aggregate-roles.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-cluster-install-workflow-controller-rbac-workflow-controller-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-cluster-install-workflow-controller-rbac-workflow-controller-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-namespace-install-argo-server-rbac-argo-server-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-namespace-install-argo-server-rbac-argo-server-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-namespace-install-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-namespace-install-overlays-argo-server-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-namespace-install-argo-server-rbac-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-namespace-install-overlays-workflow-controller-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-namespace-install-workflow-controller-rbac-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-namespace-install-workflow-controller-rbac-workflow-controller-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-agent-default-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-agent-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-argo-server-sso-secret.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-namespace-install-workflow-controller-rbac-workflow-controller-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-artifact-repositories-configmap.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-artifactgc-default-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-cluster-workflow-template-rbac.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-base-crds-full-argoproj.ioC95workflows.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-default.service-account-token-secret.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-artifactgc-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-executor-kubelet-kubelet-executor-clusterrole.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-executor-emissary-executor-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-executor-docker-executor-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-executor-kubelet-kubelet-executor-default-clusterrolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-executor-k8sapi-executor-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-executor-kubelet-executor-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-httpbin-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-httpbin-httpbin-deploy.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-httpbin-httpbin-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-executor-pns-executor-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-executor-default-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-minio-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-memoizer-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-memoizer-default-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-httpbin-my-httpbin-cred-secret.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-minio-minio-deploy.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-minio-my-minio-cred-secret.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-overlays-argo-server-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-minio-minio-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-pod-manager-default-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-overlays-workflow-controller-configmap.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-prometheus-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-prometheus-prometheus-config-cluster.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-prometheus-prometheus-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-prometheus-prometheus-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-pod-manager-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-webhooks-github.com-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-webhooks-argo-workflows-webhook-clients-secret.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-webhooks-github.com-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-webhooks-github.com-secret.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-workflow-default-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-webhooks-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-workflow-manager-default-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-workflow-manager-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-minimal-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-minimal-overlays-workflow-controller-configmap.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-base-webhooks-submit-workflow-template-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-mysql-argo-mysql-config-secret.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-mysql-mysql-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-mysql-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-mysql-overlays-workflow-controller-configmap.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-postgres-argo-postgres-config-secret.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-postgres-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-mysql-mysql-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-postgres-overlays-workflow-controller-configmap.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-postgres-postgres-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-postgres-postgres-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-sso-dex-dex-rb.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-sso-dex-dev-svc.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-sso-dex-dex-deploy.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-sso-dex-dex-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-sso-dex-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-sso-dex-dex-cm.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-sso-dex-dex-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-sso-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-sso-overlays-argo-server-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-grafana-grafana-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-grafana-grafana-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-grafana-grafana-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-argo-upstream-manifests-quick-start-sso-overlays-workflow-controller-configmap.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-grafana-grafana-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-metacontroller-base-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-grafana-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-metacontroller-base-cluster-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-grafana-grafana-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-metacontroller-base-service-account.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-minio-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-metacontroller-base-crd.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-metacontroller-base-stateful-set.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-minio-base-minio-pvc.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-minio-base-minio-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-minio-base-minio-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-metacontroller-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-minio-base-mlpipeline-minio-artifact-secret.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-minio-options-istio-istio-authorization-policy.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-minio-options-istio-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-mysql-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-mysql-base-mysql-pv-claim.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-mysql-base-mysql-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-mysql-base-mysql-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-mysql-options-istio-istio-authorization-policy.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-postgresql-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-mysql-base-mysql-serviceaccount.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-mysql-options-istio-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-postgresql-README.md",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-postgresql-base-pg-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-postgresql-base-pg-serviceaccount.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-postgresql-base-pg-secret.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-postgresql-base-pg-pvc.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-prometheus-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-postgresql-base-pg-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-prometheus-prometheus-role.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-prometheus-prometheus-deployment.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-prometheus-prometheus-sa.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-prometheus-prometheus-rolebinding.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-prometheus-prometheus-service.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-third-party-prometheus-prometheus-configmap.yaml",
+        "SPDXRef-File-manifests-apps-pipeline-upstream-wi-utils.sh",
+        "SPDXRef-File-manifests-apps-profiles-upstream-README.md",
+        "SPDXRef-File-manifests-apps-profiles-upstream-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-base-patches-manager.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-base-namespace-labels.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-crd-patches-cainjectionC95inC95profiles.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-crd-kustomizeconfig.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-crd-patches-trivialC95conversionC95patch.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-crd-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-crd-patches-webhookC95inC95profiles.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-crd-bases-kubeflow.orgC95profiles.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-default-managerC95authC95proxyC95patch.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-default-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-manager-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-default-managerC95webhookC95patch.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-default-managerC95prometheusC95metricsC95patch.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-default-webhookcainjectionC95patch.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-manager-service-account.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-overlays-kubeflow-authorizationpolicy.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-overlays-kubeflow-params.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-manager-manager.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-overlays-kubeflow-patches-remove-namespace.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-overlays-kubeflow-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-overlays-kubeflow-patches-kfam.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-overlays-kubeflow-virtual-service.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-overlays-kubeflow-service.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-overlays-standalone-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-prometheus-monitor.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-prometheus-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-rbac-authC95proxyC95clientC95clusterrole.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-rbac-authC95proxyC95roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-rbac-authC95proxyC95service.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-rbac-authC95proxyC95role.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-rbac-leaderC95electionC95role.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-rbac-leaderC95electionC95roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-rbac-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-rbac-profileC95viewerC95role.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-rbac-role.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-rbac-roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-rbac-serviceC95account.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-samples-C95v1C95profile.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-samples-C95v1C95profileC95awsC95iam.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-rbac-profileC95editorC95role.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-certmanager-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-certmanager-certificate.yaml",
+        "SPDXRef-File-manifests-apps-profiles-upstream-samples-C95v1beta1C95profile.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-crd-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-certmanager-kustomizeconfig.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-crd-patches-cainjectionC95inC95pvcviewers.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-crd-kustomizeconfig.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-crd-patches-webhookC95inC95pvcviewers.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-crd-bases-kubeflow.orgC95pvcviewers.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-default-dnsnamesC95patch.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-default-kustomizeconfig.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-default-cainjectionC95patch.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-default-managerC95authC95proxyC95patch.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-default-managerC95webhookC95patch.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-manager-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-default-removeC95namespace.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-prometheus-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-default-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-manager-manager.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-prometheus-monitor.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-rbac-authC95proxyC95clientC95clusterrole.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-rbac-authC95proxyC95role.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-rbac-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-rbac-authC95proxyC95roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-rbac-leaderC95electionC95role.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-rbac-leaderC95electionC95roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-rbac-role.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-rbac-serviceC95account.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-rbac-authC95proxyC95service.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-rbac-volumesviewerC95editorC95role.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-rbac-roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-rbac-volumesviewerC95viewerC95role.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-webhook-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-samples-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-spark-OWNERS",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-webhook-kustomizeconfig.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-webhook-service.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-samples-C95v1alpha1C95pvcviewer.yaml",
+        "SPDXRef-File-manifests-apps-pvcviewer-controller-upstream-webhook-manifests.yaml",
+        "SPDXRef-File-manifests-apps-spark-spark-operator-overlays-kubeflow-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-spark-README.md",
+        "SPDXRef-File-manifests-apps-spark-spark-operator-base-aggregated-roles.yaml",
+        "SPDXRef-File-manifests-apps-spark-spark-operator-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-spark-spark-operator-overlays-standalone-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-spark-sparkapplicationC95example.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-base-patches-addC95serviceC95account.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-base-patches-addC95controllerC95config.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-certmanager-certificate.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-base-serviceC95account.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-certmanager-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-crd-kustomizeconfig.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-crd-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-crd-bases-tensorboard.kubeflow.orgC95tensorboards.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-certmanager-kustomizeconfig.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-crd-patches-cainjectionC95inC95tensorboards.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-crd-patches-webhookC95inC95tensorboards.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-default-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-default-managerC95authC95proxyC95patch.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-default-managerC95prometheusC95metricsC95patch.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-default-webhookcainjectionC95patch.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-manager-controllerC95managerC95config.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-default-managerC95webhookC95patch.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-manager-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-overlays-kubeflow-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-manager-manager.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-overlays-standalone-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-overlays-kubeflow-patches-remove-namespace.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-prometheus-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-prometheus-monitor.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-rbac-authC95proxyC95clientC95clusterrole.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-rbac-authC95proxyC95role.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-rbac-authC95proxyC95service.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-rbac-authC95proxyC95roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-rbac-leaderC95electionC95role.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-rbac-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-rbac-role.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-rbac-leaderC95electionC95roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-webhook-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-rbac-roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-samples-tensorboardC95v1alpha1C95tensorboard.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-rbac-serviceC95account.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-webhook-manifests.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-webhook-service.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboards-web-app-upstream-base-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboard-controller-upstream-webhook-kustomizeconfig.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboards-web-app-upstream-base-params.env",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboards-web-app-upstream-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboards-web-app-upstream-base-deployment.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboards-web-app-upstream-base-service-account.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboards-web-app-upstream-base-cluster-role.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboards-web-app-upstream-base-service.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboards-web-app-upstream-overlays-istio-destination-rule.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboards-web-app-upstream-overlays-istio-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboards-web-app-upstream-overlays-istio-authorization-policy.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboards-web-app-upstream-overlays-istio-params.yaml",
+        "SPDXRef-File-manifests-apps-tensorboard-tensorboards-web-app-upstream-overlays-istio-virtual-service.yaml",
+        "SPDXRef-File-manifests-apps-spark-spark-operator-base-resources.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-crds-kubeflow.orgC95paddlejobs.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-crds-kubeflow.orgC95pytorchjobs.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-crds-kubeflow.orgC95jaxjobs.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-crds-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-crds-kubeflow.orgC95mpijobs.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-rbac-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-deployment.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-rbac-service-account.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-rbac-role.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-service.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-webhook-manifests.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-webhook-kustomizeconfig.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-webhook-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-webhook-patch.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-overlays-kubeflow-kubeflow-training-roles.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-overlays-kubeflow-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-overlays-standalone-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-overlays-standalone-namespace.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-crds-kubeflow.orgC95trainjobs.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-crds-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-manager-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-manager-manager.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-rbac-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-crds-kubeflow.orgC95tfjobs.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-rbac-role.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-rbac-roleC95binding.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-rbac-serviceC95account.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-runtimes-pre-training-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-runtimes-pre-training-torch-distributed.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-webhook-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-webhook-kustomizeconfig.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-base-crds-kubeflow.orgC95xgboostjobs.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-webhook-manifests.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-webhook-patch.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-overlays-only-manager-namespace.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-overlays-only-manager-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-overlays-only-runtimes-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-overlays-standalone-namespace.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-overlays-standalone-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-base-cluster-role-binding.yaml",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-base-cluster-role.yaml",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-base-deployment.yaml",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-base-params.env",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-base-service-account.yaml",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-base-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-overlays-istio-authorization-policy.yaml",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-base-service.yaml",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-base-viewer-spec.yaml",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-overlays-istio-kustomization.yaml",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-overlays-istio-params.yaml",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-overlays-istio-destination-rule.yaml",
+        "SPDXRef-File-manifests-common-cert-manager-OWNERS",
+        "SPDXRef-File-manifests-apps-volumes-web-app-upstream-overlays-istio-virtual-service.yaml",
+        "SPDXRef-File-manifests-common-cert-manager-README.md",
+        "SPDXRef-File-manifests-common-cert-manager-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-cert-manager-kubeflow-issuer-base-cluster-issuer.yaml",
+        "SPDXRef-File-manifests-common-cert-manager-kubeflow-issuer-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-dex-OWNERS",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-crds-kubeflow.orgC95clustertrainingruntimes.yaml",
+        "SPDXRef-File-manifests-common-dex-base-config-map.yaml",
+        "SPDXRef-File-manifests-common-dex-README.md",
+        "SPDXRef-File-manifests-common-dex-base-crds.yaml",
+        "SPDXRef-File-manifests-common-dex-base-dex-passwords.yaml",
+        "SPDXRef-File-manifests-common-dex-base-deployment.yaml",
+        "SPDXRef-File-manifests-common-dex-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-dex-base-namespace.yaml",
+        "SPDXRef-File-manifests-common-dex-base-secretC95params.env",
+        "SPDXRef-File-manifests-common-dex-base-service.yaml",
+        "SPDXRef-File-manifests-common-dex-overlays-istio-kustomization.yaml",
+        "SPDXRef-File-manifests-common-dex-overlays-oauth2-proxy-config-map.yaml",
+        "SPDXRef-File-manifests-apps-training-operator-upstream-v2-base-crds-kubeflow.orgC95trainingruntimes.yaml",
+        "SPDXRef-File-manifests-common-dex-overlays-istio-virtual-service.yaml",
+        "SPDXRef-File-manifests-common-dex-overlays-oauth2-proxy-kustomization.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-README.md",
+        "SPDXRef-File-manifests-common-istio-1-24-cluster-local-gateway-base-gateway-authorizationpolicy.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-cluster-local-gateway-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-cluster-local-gateway-base-patches-remove-pdb.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-cluster-local-gateway-base-cluster-local-gateway.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-cluster-local-gateway-base-gateway.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-crds-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-base-denyC95allC95authorizationpolicy.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-base-gateway.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-base-gatewayC95authorizationpolicy.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-base-patches-istio-configmap-disable-tracing.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-base-patches-disable-debugging.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-base-patches-istio-ingressgateway-remove-pdb.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-base-patches-istiod-remove-pdb.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-base-patches-seccomp-istio-ingressgateway.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-base-install.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-base-patches-seccomp-istiod.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-base-patches-service.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-install-overlays-oauth2-proxy-kustomization.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-namespace-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-namespace-base-namespace.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-kubeflow-istio-resources-base-cluster-roles.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-kubeflow-istio-resources-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-kubeflow-istio-resources-base-kf-istio-resources.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-profile-overlay.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-profile.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-README.md",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-cluster-local-gateway-base-cluster-local-gateway.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-split-istio-packages",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-cluster-local-gateway-base-gateway-authorizationpolicy.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-cluster-local-gateway-base-patches-remove-pdb.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-cluster-local-gateway-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-cert-manager-base-upstream-cert-manager.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-cluster-local-gateway-base-gateway.yaml",
+        "SPDXRef-File-manifests-common-istio-1-24-istio-crds-base-crd.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-crds-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-base-denyC95allC95authorizationpolicy.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-base-gatewayC95authorizationpolicy.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-base-gateway.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-base-patches-istio-configmap-disable-tracing.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-base-patches-istio-ingressgateway-remove-pdb.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-base-patches-istiod-remove-pdb.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-base-patches-seccomp-istio-ingressgateway.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-base-patches-disable-debugging.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-base-patches-seccomp-istiod.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-overlays-oauth2-proxy-kustomization.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-base-patches-service.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-install-base-install.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-namespace-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-namespace-base-namespace.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-kubeflow-istio-resources-base-cluster-roles.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-kubeflow-istio-resources-base-kf-istio-resources.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-kubeflow-istio-resources-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-knative-OWNERS",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-profile-overlay.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-profile.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-split-istio-packages",
+        "SPDXRef-File-manifests-common-knative-knative-eventing-base-aaa-values.yaml",
+        "SPDXRef-File-manifests-common-knative-README.md",
+        "SPDXRef-File-manifests-common-knative-knative-eventing-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-eventing-base-patches-clusterrole-patch.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-eventing-base-upstream-mt-channel-broker.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-eventing-base-upstream-in-memory-channel.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-eventing-base-dashboards.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-eventing-post-install-jobs-base-eventing-post-install.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-eventing-post-install-jobs-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-istio-authorization-policy.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-patches-config-deployment.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-patches-config-istio.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-patches-knative-serving-namespaced-admin.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-patches-knative-serving-namespaced-edit.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-patches-knative-serving-namespaced-view.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-patches-remove-gateway.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-patches-namespace-injection.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-patches-seccomp.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-patches-service-labels.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-patches-sidecar-injection.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-eventing-base-upstream-eventing-core.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-upstream-net-istio.yaml",
+        "SPDXRef-File-manifests-common-istio-cni-1-24-istio-crds-base-crd.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-overlays-gateways-kustomization.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-overlays-gateways-patches-config-domain.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-overlays-gateways-patches-gateway-selector-in-istio-system.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-overlays-gateways-patches-gateway-selector-in-knative-serving.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-post-install-jobs-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-kubeflow-namespace-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-post-install-jobs-base-serving-post-install-jobs.yaml",
+        "SPDXRef-File-manifests-common-kubeflow-roles-OWNERS",
+        "SPDXRef-File-manifests-common-kubeflow-namespace-base-namespace.yaml",
+        "SPDXRef-File-manifests-common-kubeflow-roles-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-OWNERS",
+        "SPDXRef-File-manifests-common-kubeflow-roles-README.md",
+        "SPDXRef-File-manifests-common-kubeflow-roles-base-cluster-roles.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-cache-server.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-centraldashboard.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-README.md",
+        "SPDXRef-File-manifests-common-networkpolicies-base-default-allow-same-namespace.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-jupyter-web-app.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-katib-db-manager.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-katib-controller.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-katib-ui.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-kserve-models-web-app.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-metadata-envoy.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-metadata-grpc-server.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-kserve.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-minio.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-ml-pipeline-ui.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-model-registry-ui.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-model-registry.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-ml-pipeline.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-tensorboards-web-app.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-poddefaults.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-pvcviewer-webhook.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-spark-operator-webhook.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-OWNERS",
+        "SPDXRef-File-manifests-common-networkpolicies-base-volumes-web-app.yaml",
+        "SPDXRef-File-manifests-common-networkpolicies-base-training-operator-webhook.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-base-README.md",
+        "SPDXRef-File-manifests-common-oauth2-proxy-README.md",
+        "SPDXRef-File-manifests-common-oauth2-proxy-base-deployment.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-base-namespace.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-base-kubeflow-logo.svg",
+        "SPDXRef-File-manifests-common-oauth2-proxy-base-oauth2C95proxy.cfg",
+        "SPDXRef-File-manifests-common-oauth2-proxy-base-service.yaml",
+        "SPDXRef-File-manifests-common-knative-knative-serving-base-upstream-serving-core.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-base-serviceaccount.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-base-virtualservice.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-allow-unauthenticated-issuer-discovery-clusterrolebinding.unauthenticated-oidc-viewer.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-allow-unauthenticated-issuer-discovery-kustomization.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-central-dashboard-kustomization.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-cluster-jwks-proxy-README.md",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-README.md",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-allow-unauthenticated-issuer-discovery-README.md",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-central-dashboard-patches-deployment.logout-url.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-cluster-jwks-proxy-kustomization.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-cluster-jwks-proxy-cluster-jwks-proxy.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-external-auth-authorizationpolicy.istio-ingressgateway-oauth2-proxy.cloudflare.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-external-auth-README.md",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-external-auth-authorizationpolicy.istio-ingressgateway-oauth2-proxy.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-external-auth-authorizationpolicy.istio-ingressgateway-require-jwt.cloudflare.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-external-auth-authorizationpolicy.istio-ingressgateway-require-jwt.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-external-auth-kustomization.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-external-auth-patches-README.md",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-external-auth-patches-kustomization.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-external-auth-requestauthentication.dex-jwt.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-external-auth-patches-patches-deployment.jwt-refresh-interval.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-m2m-kustomization.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-m2m-README.md",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-external-auth-patches-patches-cm.enable-oauth2-proxy.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-overlays-m2m-dex-and-eks-kustomization.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-istio-m2m-requestauthentication.yaml",
+        "SPDXRef-File-manifests-common-user-namespace-base-kustomization.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-overlays-m2m-dex-only-kustomization.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-overlays-m2m-dex-and-kind-kustomization.yaml",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-oauth2-flow.svg",
+        "SPDXRef-File-manifests-common-user-namespace-base-params.yaml",
+        "SPDXRef-File-manifests-common-user-namespace-base-params.env",
+        "SPDXRef-File-manifests-experimental-OWNERS",
+        "SPDXRef-File-manifests-example-kustomization.yaml",
+        "SPDXRef-File-manifests-common-user-namespace-base-profile-instance.yaml",
+        "SPDXRef-File-manifests-experimental-ray-Makefile",
+        "SPDXRef-File-manifests-experimental-ray-OWNERS",
+        "SPDXRef-File-manifests-experimental-README.md",
+        "SPDXRef-File-manifests-experimental-ray-UPGRADE.md",
+        "SPDXRef-File-manifests-common-oauth2-proxy-components-kubeflowC95authC95diagram.svg",
+        "SPDXRef-File-manifests-experimental-ray-README.md",
+        "SPDXRef-File-manifests-experimental-ray-kuberay-operator-base-aggregated-roles.yaml",
+        "SPDXRef-File-manifests-experimental-ray-assets-map-of-ray.png",
+        "SPDXRef-File-manifests-experimental-ray-kuberay-operator-base-kustomization.yaml",
+        "SPDXRef-File-manifests-experimental-ray-kuberay-operator-overlays-kubeflow-disable-injection.yaml",
+        "SPDXRef-File-manifests-experimental-ray-kuberay-operator-overlays-kubeflow-kustomization.yaml",
+        "SPDXRef-File-manifests-experimental-ray-kuberay-operator-overlays-standalone-kustomization.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-OWNERS",
+        "SPDXRef-File-manifests-experimental-ray-test.sh",
+        "SPDXRef-File-manifests-experimental-ray-assets-architecture.svg",
+        "SPDXRef-File-manifests-experimental-seaweedfs-UPDGRADE.md",
+        "SPDXRef-File-manifests-experimental-seaweedfs-README.md",
+        "SPDXRef-File-manifests-experimental-ray-rayclusterC95example.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-base-minio-service-patch.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-base-seaweedfs-kustomization.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-base-kustomization.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-base-pipeline-profile-controller-deployment.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-base-pipeline-profile-controller-sync.py",
+        "SPDXRef-File-manifests-experimental-seaweedfs-base-seaweedfs-seaweedfs-networkpolicy.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-base-seaweedfs-seaweedfs-create-admin-user-job.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-base-seaweedfs-seaweedfs-pvc.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-base-seaweedfs-seaweedfs-service-account.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-base-seaweedfs-seaweedfs-deployment.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-istio-kustomization.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-base-seaweedfs-seaweedfs-service.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-istio-istio-authorization-policy.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-dynamic-baseline-kustomization.yaml",
+        "SPDXRef-File-manifests-experimental-seaweedfs-test.sh",
+        "SPDXRef-File-manifests-experimental-security-PSS-dynamic-baseline-namespace-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-dynamic-restricted-kustomization.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-baseline-kustomization.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-baseline-patches-auth-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-dynamic-restricted-namespace-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-baseline-patches-istio-system-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-baseline-patches-cert-manager-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-baseline-patches-knative-serving-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-baseline-patches-kubeflow-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-restricted-kustomization.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-restricted-patches-auth-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-baseline-patches-oauth2-proxy-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-restricted-patches-cert-manager-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-restricted-patches-istio-system-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-restricted-patches-knative-serving-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-restricted-patches-kubeflow-labels.yaml",
+        "SPDXRef-File-manifests-experimental-security-PSS-static-restricted-patches-oauth2-proxy-labels.yaml",
+        "SPDXRef-File-manifests-kk.yaml",
+        "SPDXRef-File-manifests-kustomizeC95nstarx-C95coreC95kf.py",
+        "SPDXRef-File-manifests-kustomizeC95nstarx-kustomization.yaml",
+        "SPDXRef-File-manifests-proposals-20220926-contrib-component-guidelines.md",
+        "SPDXRef-File-manifests-proposals-20200913-rootlessKubeflow.md",
+        "SPDXRef-File-manifests-proposals-README.md",
+        "SPDXRef-File-manifests-proposals-20240606-jwt-handling.md",
+        "SPDXRef-File-manifests-requirements.txt",
+        "SPDXRef-File-manifests-proposals-20230323-end-to-end-testing.md",
+        "SPDXRef-File-manifests-scripts-library.sh",
+        "SPDXRef-File-manifests-scripts-synchronize-istio-cni-manifests.sh",
+        "SPDXRef-File-manifests-scripts-synchronize-istio-manifests.sh",
+        "SPDXRef-File-manifests-runC95installC95kf.sh",
+        "SPDXRef-File-manifests-scripts-synchronize-katib-manifests.sh",
+        "SPDXRef-File-manifests-scripts-synchronize-kserve-kserve-manifests.sh",
+        "SPDXRef-File-manifests-scripts-synchronize-kubeflow-manifests.sh",
+        "SPDXRef-File-manifests-scripts-synchronize-knative-manifests.sh",
+        "SPDXRef-File-manifests-scripts-synchronize-kserve-web-application-manifests.sh",
+        "SPDXRef-File-manifests-scripts-synchronize-model-registry-manifests.sh",
+        "SPDXRef-File-manifests-scripts-synchronize-pipelines-manifests.sh",
+        "SPDXRef-File-manifests-scripts-synchronize-training-operator-manifests.sh",
+        "SPDXRef-File-manifests-scripts-template.sh",
+        "SPDXRef-File-manifests-scripts-synchronize-spark-operator-manifests.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-enableC95baselineC95PSS.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-enableC95restrictedC95PSS.sh",
+        "SPDXRef-File-manifests-tests-README.md",
+        "SPDXRef-File-manifests-scripts-trivyC95scan.py",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95centralC95dashboard.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95argoC95cli.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95KinDC95createC95KinDC95clusterC95installC95kustomize.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95certC95manager.sh",
+        "SPDXRef-File-manifests-experimental-ray-kuberay-operator-base-resources.yaml",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95dex.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95katib.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95kubectl.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95knative-cni.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95istio-cni.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95kserve.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95kubeflowC95profile.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95oauth2-proxy.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95multiC95tenancy.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95kustomize.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95pipelines.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95pipelinesC95swfs.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95spark.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95trivy.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95volumesC95webC95application.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-kf-objects-katibC95test.yaml",
+        "SPDXRef-File-manifests-tests-gh-actions-installC95trainingC95operator.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-kf-objects-notebook.test.kubeflow-user-example.com.yaml",
+        "SPDXRef-File-manifests-tests-gh-actions-kf-objects-poddefaults.access-ml-pipeline.kubeflow-user-example-com.yaml",
+        "SPDXRef-File-manifests-tests-gh-actions-kf-objects-trainingC95operatorC95job.yaml",
+        "SPDXRef-File-manifests-tests-gh-actions-kserve-data-irisC95input.json",
+        "SPDXRef-File-manifests-tests-gh-actions-kf-objects-testC95pipeline.py",
+        "SPDXRef-File-manifests-tests-gh-actions-kserve-requirements.txt",
+        "SPDXRef-File-manifests-tests-gh-actions-kf-objects-kserveC95test.yaml",
+        "SPDXRef-File-manifests-tests-gh-actions-portC95forwardC95gateway.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-oauth2C95dexC95credentials.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-kserve-testC95sklearn.py",
+        "SPDXRef-File-manifests-tests-gh-actions-kserve-utils.py",
+        "SPDXRef-File-manifests-tests-gh-actions-runC95andC95waitC95kubeflowC95pipeline.py",
+        "SPDXRef-File-manifests-tests-gh-actions-testC95pipeline.py",
+        "SPDXRef-File-manifests-tests-gh-actions-testC95kserve.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-testC95spark.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-runasnonroot.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-testC95trainingC95operator.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-testC95dexC95login.py",
+        "SPDXRef-File-manifests-tests-gh-actions-testC95volumesC95webC95application.sh",
+        "SPDXRef-File-manifests-tests-gh-actions-trivyC95scan.py"
+      ],
+      "licenseInfoFromFiles": [
+        "Apache-2.0"
+      ],
+      "checksums": [],
+      "packageVerificationCode": {
+        "packageVerificationCodeValue": "b6cb3e9e3e77820828d3fdd465b04a2b5ef2360b"
+      }
+    }
+  ]
+};
+
+        // Tab switching
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            // Load embedded data
+            const sbomData = EMBEDDED_SBOM_DATA;
+            
+            // Update overview statistics
+            document.getElementById('total-files').textContent = sbomData.statistics.totalFiles;
+            document.getElementById('total-packages').textContent = sbomData.statistics.totalPackages;
+            document.getElementById('total-relationships').textContent = sbomData.statistics.totalRelationships;
+            document.getElementById('spdx-version').textContent = sbomData.metadata.spdxVersion;
+            
+            // Update notices
+            document.getElementById('total-files-notice').textContent = sbomData.statistics.totalFiles;
+            document.getElementById('total-relationships-notice').textContent = sbomData.statistics.totalRelationships;
+            
+            // Update document info
+            document.getElementById('doc-name').textContent = sbomData.metadata.name;
+            document.getElementById('doc-namespace').textContent = sbomData.metadata.documentNamespace;
+            document.getElementById('doc-spdxid').textContent = sbomData.metadata.SPDXID;
+            document.getElementById('doc-license').textContent = sbomData.metadata.dataLicense;
+            
+            // Update creation info
+            document.getElementById('creation-date').textContent = sbomData.metadata.creationInfo.created;
+            document.getElementById('creator').textContent = sbomData.metadata.creationInfo.creators.join(', ');
+            document.getElementById('license-version').textContent = sbomData.metadata.creationInfo.licenseListVersion;
+            
+            // Generate license summary
+            const licenseSummaryHtml = Object.entries(sbomData.statistics.licenseStats)
+                .map(([license, count]) => `
+                    <div class="summary-item">
+                        <h4>License</h4>
+                        <p>${license}</p>
+                        <h4 style="margin-top: 10px;">Files</h4>
+                        <p>${count}</p>
+                    </div>
+                `).join('');
+            document.getElementById('license-summary').innerHTML = licenseSummaryHtml;
+            
+            // Generate file type summary
+            const typeSummaryHtml = Object.entries(sbomData.statistics.typeStats)
+                .sort((a, b) => b[1] - a[1])
+                .map(([type, count]) => `
+                    <div class="summary-item">
+                        <h4>Type</h4>
+                        <p>${type}</p>
+                        <h4 style="margin-top: 10px;">Count</h4>
+                        <p>${count}</p>
+                    </div>
+                `).join('');
+            document.getElementById('filetype-summary').innerHTML = typeSummaryHtml;
+            
+            // Generate files table
+            let filesHtml = `
+                <table class="file-table">
+                    <thead>
+                        <tr>
+                            <th>File Path</th>
+                            <th>License</th>
+                            <th>Type</th>
+                            <th>SHA256</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            sbomData.sampleFiles.forEach(file => {
+                filesHtml += `
+                    <tr>
+                        <td class="file-path">${file.fileName}</td>
+                        <td><span class="license-badge">${file.licenseConcluded || 'Unknown'}</span></td>
+                        <td>${file.fileTypes ? file.fileTypes.join(', ') : '-'}</td>
+                        <td class="file-path">${file.sha256}</td>
+                    </tr>
+                `;
+            });
+            
+            filesHtml += '</tbody></table>';
+            document.getElementById('files-container').innerHTML = filesHtml;
+            
+            // Generate packages
+            let packagesHtml = '<div class="metadata-grid">';
+            sbomData.packages.forEach(pkg => {
+                packagesHtml += `
+                    <div class="metadata-card">
+                        <h3>${pkg.name || 'Unknown Package'}</h3>
+                        <p><span class="label">SPDX ID:</span> ${pkg.SPDXID}</p>
+                        <p><span class="label">Version:</span> ${pkg.versionInfo || 'Not specified'}</p>
+                        <p><span class="label">License:</span> ${pkg.licenseConcluded || 'Unknown'}</p>
+                        <p><span class="label">Download Location:</span> ${pkg.downloadLocation || 'Not specified'}</p>
+                        <p><span class="label">Files Analyzed:</span> ${pkg.filesAnalyzed ? 'Yes' : 'No'}</p>
+                        <p><span class="label">Contains:</span> ${pkg.hasFiles ? pkg.hasFiles.length : 0} files</p>
+                    </div>
+                `;
+            });
+            packagesHtml += '</div>';
+            document.getElementById('packages-container').innerHTML = packagesHtml;
+            
+            // Generate relationships table
+            let relationshipsHtml = `
+                <table class="file-table">
+                    <thead>
+                        <tr>
+                            <th>Source Element</th>
+                            <th>Relationship Type</th>
+                            <th>Target Element</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            sbomData.sampleRelationships.forEach(rel => {
+                relationshipsHtml += `
+                    <tr>
+                        <td class="file-path">${rel.source}</td>
+                        <td><strong>${rel.type}</strong></td>
+                        <td class="file-path">${rel.target}</td>
+                    </tr>
+                `;
+            });
+            
+            relationshipsHtml += '</tbody></table>';
+            document.getElementById('relationships-container').innerHTML = relationshipsHtml;
+        });
+    </script>
+</body>
+</html>
